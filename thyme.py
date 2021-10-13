@@ -1,5 +1,7 @@
+from copy import copy
 import datetime
-from typing import Optional
+from operator import attrgetter
+from typing import Iterable, Optional
 
 import typer
 from more_itertools import bucket
@@ -40,10 +42,30 @@ def _print_table(entries: list[TimeEntry]):
     bucket_keys = sorted(list(buckets))
 
     for key in bucket_keys:
-        entry_dicts = [entry.dict() for entry in buckets[key]]
+        bucket_entries = buckets[key]
+        entry_dicts = [entry.dict() for entry in bucket_entries]
+
+        summed_hours = sum(map(attrgetter("hours"), entries))
+        entry_dicts.append({"description": "Total", "hours": summed_hours})
+
         typer.secho(f"Entries for {key}:", fg=typer.colors.BLUE, bold=True)
         typer.echo(tabulate(entry_dicts, headers="keys"))
         typer.echo()
+
+
+def _consolidate_entries(entries: Iterable[TimeEntry]) -> Iterable[TimeEntry]:
+    buckets = bucket(entries, key=lambda x: (x.issue, x.description, x.date))
+    bucket_values = [list(buckets[k]) for k in buckets]
+
+    def create_consolidated_entry(entries: list[TimeEntry]) -> TimeEntry:
+        summed_hours = sum(map(attrgetter("hours"), entries))
+        entry = copy(entries[0])
+        entry.hours = summed_hours
+        return entry
+
+    consolidated = map(create_consolidated_entry, bucket_values)
+
+    return consolidated
 
 
 def main(
@@ -73,7 +95,8 @@ def main(
     parsed_from_date, parsed_to_date = _parse_dates(date, from_date, to_date)
 
     traggo = TraggoConnector(url=traggo_url, api_token=traggo_api_key)
-    entries = list(traggo.get_time_entries(parsed_from_date, parsed_to_date))
+    entries = traggo.get_time_entries(parsed_from_date, parsed_to_date)
+    entries = list(_consolidate_entries(entries))
 
     typer.echo(f"Found {len(entries)} entries")
     typer.echo()
