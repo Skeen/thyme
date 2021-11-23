@@ -43,10 +43,10 @@ def _print_table(entries: list[TimeEntry]):
     bucket_keys = sorted(list(buckets))
 
     for key in bucket_keys:
-        bucket_entries = buckets[key]
+        bucket_entries = list(buckets[key])
         entry_dicts = [entry.dict() for entry in bucket_entries]
 
-        summed_hours = sum(map(attrgetter("hours"), entries))
+        summed_hours = sum(map(attrgetter("hours"), bucket_entries))
         entry_dicts.append({"description": "Total", "hours": summed_hours})
 
         typer.secho(f"Entries for {key}:", fg=typer.colors.BLUE, bold=True)
