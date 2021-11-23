@@ -20,6 +20,26 @@ For a full list of options, run:
 python thyme.py --help
 ```
 
+## Docker
+```
+docker-compose up -d --build
+```
+gives a `traggo` instance on `localhost:3030`. Environment variables can be set in e.g. a `docker-compose.override.yml`
+
+```yml
+version: "3.9"
+services:
+  traggo:
+    environment:
+      TRAGGO_DEFAULT_USER_NAME: "AzureDiamond"
+      TRAGGO_DEFAULT_USER_PASS: "hunter2"
+  thyme:
+    environment:
+      REDMINE_API_KEY: a1234
+      TRAGGO_API_KEY: b5678
+```
+then, `docker-compose run thyme` will... run `thyme`!
+
 ## TODO
 
 - Add support for other time tracking backends
