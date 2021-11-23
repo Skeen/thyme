@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  traggo:
+    image: traggo/server:latest
+    ports:
+      - 3030:3030
+    volumes:
+      - ~/.traggodata:/opt/traggo/data
+  thyme:
+    build:
+      context: .
+    environment:
+      TRAGGO_URL: http://traggo:3030

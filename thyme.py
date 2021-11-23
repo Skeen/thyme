@@ -1,7 +1,8 @@
-from copy import copy
 import datetime
+from copy import copy
 from operator import attrgetter
-from typing import Iterable, Optional
+from typing import Iterable
+from typing import Optional
 
 import typer
 from more_itertools import bucket
