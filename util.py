@@ -1,4 +1,8 @@
+from datetime import date
 from datetime import datetime
+
+import pytz
+from pytz import timezone
 
 
 def hours_from_datetimes(
@@ -11,3 +15,17 @@ def hours_from_datetimes(
         minutes = 15 * round(minutes / 15)
 
     return hours + (minutes / 60)
+
+
+def convert_date_to_datetime(input_date: date) -> datetime:
+    # TODO: Make timezone configurable
+    return pytz.utc.localize(datetime.combine(input_date, datetime.min.time()))
+
+
+def parse_timestamp(time: str) -> datetime:
+    if ":" in time:
+        parsed = datetime.strptime(time, "%H:%M")
+    else:
+        parsed = datetime.strptime(time, "%H%M")
+    naive = datetime.combine(datetime.now(), parsed.time())
+    return timezone("Europe/Copenhagen").localize(naive)

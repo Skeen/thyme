@@ -1,19 +1,20 @@
 from datetime import date
 from datetime import datetime
-from datetime import timedelta
-from typing import Iterable
+from typing import Iterable, Optional
 
-import pytz
 import typer
 from gql import Client
-from gql import gql
 from gql.transport.requests import RequestsHTTPTransport
-from graphql.language.ast import Document
 from more_itertools import one
 from pydantic import BaseModel
+import pytz
 
 from model import TimeEntry
 from util import hours_from_datetimes
+from traggo.requests import get_timespan_query
+from traggo.requests import start_timer_mutation
+from traggo.requests import stop_timer_mutation
+from traggo.requests import get_timers_query
 
 
 class TraggoTimeSpan(BaseModel):
@@ -46,34 +47,6 @@ class TraggoConnector:
         transport = RequestsHTTPTransport(url=url, headers=headers)
         return Client(transport=transport, fetch_schema_from_transport=True)
 
-    def _convert_date_to_datetime(self, input_date: date) -> datetime:
-        # TODO: Make timezone configurable
-        return pytz.utc.localize(datetime.combine(input_date, datetime.min.time()))
-
-    def _get_timespan_query(self, from_date: date, to_date: date) -> Document:
-        from_datetime = self._convert_date_to_datetime(from_date)
-        to_datetime = self._convert_date_to_datetime(to_date) + timedelta(days=1)
-
-        query = f"""
-            {{
-                timeSpans(
-                    fromInclusive: "{from_datetime.isoformat()}",
-                    toInclusive: "{to_datetime.isoformat()}"
-                ) {{
-                    timeSpans {{
-                        note,
-                        start,
-                        end,
-                        tags {{
-                            key,
-                            value
-                        }}
-                    }}
-                }}
-            }}
-        """
-        return gql(query)
-
     def _convert_timespan(self, timespan: TraggoTimeSpan) -> TimeEntry:
         hours = hours_from_datetimes(timespan.start, timespan.end, rounding=True)
 
@@ -87,7 +60,7 @@ class TraggoConnector:
     def _get_timespans(
         self, from_date: date, to_date: date
     ) -> Iterable[TraggoTimeSpan]:
-        result = self.traggo.execute(self._get_timespan_query(from_date, to_date))
+        result = self.traggo.execute(get_timespan_query(from_date, to_date))
         timespans = result.get("timeSpans").get("timeSpans")
         return map(lambda x: TraggoTimeSpan.parse_from_dict(**x), timespans)
 
@@ -95,3 +68,17 @@ class TraggoConnector:
         typer.secho("Reading timespans from Traggo 🦫⏱️")
         timespans = self._get_timespans(from_date, to_date)
         return map(self._convert_timespan, timespans)
+
+    def start_timer(self, start_time: datetime, issue, type, note):
+        document, vars = start_timer_mutation(start_time, issue=issue, type=type, note=note)
+        self.traggo.execute(document, variable_values=vars)
+
+    def stop_timer(self, stop_time):
+        timers = self.traggo.execute(get_timers_query()).get("timers")
+        if not timers:
+            return
+
+        timer_id = timers[0].get("id")
+
+        document, vars = stop_timer_mutation(timer_id, stop_time)
+        self.traggo.execute(document, variable_values=vars)
