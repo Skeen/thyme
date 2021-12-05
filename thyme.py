@@ -13,9 +13,8 @@ from redmine import RedmineConnector
 from traggo.traggo import TraggoConnector
 
 from util import parse_timestamp
+import config
 
-REDMINE_URL = "https://redmine.magenta-aps.dk/"
-TRAGGO_URL = "https://traggo.moesgaard.dev"
 
 app = typer.Typer()
 
@@ -75,8 +74,6 @@ def _consolidate_entries(entries: Iterable[TimeEntry]) -> Iterable[TimeEntry]:
 
 @app.command()
 def start(
-    traggo_api_key: str = typer.Argument(..., envvar="TRAGGO_API_KEY"),
-    traggo_url: str = typer.Argument(TRAGGO_URL, envvar="TRAGGO_URL"),
     start_time: str = typer.Option(
         datetime.datetime.now().time().strftime("%H:%M"), prompt="Start time"
     ),
@@ -87,7 +84,8 @@ def start(
     """
     Starts a new timer.
     """
-    traggo = TraggoConnector(url=traggo_url, api_token=traggo_api_key)
+    settings = config.get_settings()
+    traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
 
     parsed_start_time = parse_timestamp(start_time)
     traggo.start_timer(parsed_start_time, issue, type, note)
@@ -98,8 +96,6 @@ def start(
 
 @app.command()
 def stop(
-    traggo_api_key: str = typer.Argument(..., envvar="TRAGGO_API_KEY"),
-    traggo_url: str = typer.Argument(TRAGGO_URL, envvar="TRAGGO_URL"),
     stop_time: str = typer.Option(
         datetime.datetime.now().time().strftime("%H:%M"), prompt="Stop time"
     ),
@@ -110,7 +106,8 @@ def stop(
     If more than one timer is running for whatever reason, the first one found
     will be stopped
     """
-    traggo = TraggoConnector(url=traggo_url, api_token=traggo_api_key)
+    settings = config.get_settings()
+    traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
 
     parsed_stop_time = parse_timestamp(stop_time)
     traggo.stop_timer(parsed_stop_time)
@@ -120,35 +117,27 @@ def stop(
 
 
 @app.command()
-def edit(
-    traggo_api_key: str = typer.Argument(..., envvar="TRAGGO_API_KEY"),
-    traggo_url: str = typer.Argument(TRAGGO_URL, envvar="TRAGGO_URL"),
-):
+def edit():
     """
     Edits the currently running timer.
     """
-    traggo = TraggoConnector(url=traggo_url, api_token=traggo_api_key)
+    settings = config.get_settings()
+    traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
     typer.echo("Not yet implemented, lol 🤷")
 
 
 @app.command()
-def status(
-    traggo_api_key: str = typer.Argument(..., envvar="TRAGGO_API_KEY"),
-    traggo_url: str = typer.Argument(TRAGGO_URL, envvar="TRAGGO_URL"),
-):
+def status():
     """
     Shows the status of the currently running timer.
     """
-    traggo = TraggoConnector(url=traggo_url, api_token=traggo_api_key)
+    settings = config.get_settings()
+    traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
     typer.echo("Not yet implemented, lol 🤷")
 
 
 @app.command()
 def export(
-    redmine_api_key: str = typer.Argument(..., envvar="REDMINE_API_KEY"),
-    traggo_api_key: str = typer.Argument(..., envvar="TRAGGO_API_KEY"),
-    redmine_url: str = typer.Argument(REDMINE_URL, envvar="REDMINE_URL"),
-    traggo_url: str = typer.Argument(TRAGGO_URL, envvar="TRAGGO_URL"),
     date: Optional[str] = typer.Option(None, help="A single date to fetch."),
     from_date: Optional[str] = typer.Option(
         None, help="The lower bound of a date range to fetch. Is overridden by --date."
@@ -167,9 +156,10 @@ def export(
 
     Can optionally search for other dates, or date ranges.
     """
+    settings = config.get_settings()
     parsed_from_date, parsed_to_date = _parse_dates(date, from_date, to_date)
 
-    traggo = TraggoConnector(url=traggo_url, api_token=traggo_api_key)
+    traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
     entries = traggo.get_time_entries(parsed_from_date, parsed_to_date)
     entries = list(_consolidate_entries(entries))
 
@@ -187,7 +177,7 @@ def export(
         raise typer.Abort()
 
     # Send entries to Redmine
-    redmine = RedmineConnector(redmine_url, redmine_api_key)
+    redmine = RedmineConnector(settings.redmine_url, settings.redmine_api_key)
     redmine.create_time_entries(entries)
 
 

@@ -6,7 +6,7 @@ authors = ["Christoffer Moesgaard <christoffer@moesgaard.dev>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
-pydantic = "^1.8.2"
+pydantic = {extras = ["dotenv"], version = "^1.8.2"}
 requests = "^2.25.1"
 python-redmine = "^2.3.0"
 typer = "^0.3.2"
