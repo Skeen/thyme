@@ -6,14 +6,14 @@ from typing import Optional
 
 import typer
 from more_itertools import bucket
+from more_itertools.more import first
 from tabulate import tabulate
 
+import config
 from model import TimeEntry
 from redmine import RedmineConnector
 from traggo.traggo import TraggoConnector
-
 from util import parse_timestamp
-import config
 
 
 app = typer.Typer()
@@ -110,7 +110,14 @@ def stop(
     traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
 
     parsed_stop_time = parse_timestamp(stop_time)
-    traggo.stop_timer(parsed_stop_time)
+
+    timers = traggo.get_timers()
+    if not timers:
+        typer.echo("No timer running")
+        return
+    timer = first(timers)
+
+    traggo.stop_timer(timer, parsed_stop_time)
 
     typer.echo("")
     typer.echo("Timer stopped")
@@ -123,7 +130,22 @@ def edit():
     """
     settings = config.get_settings()
     traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
-    typer.echo("Not yet implemented, lol 🤷")
+    timers = traggo.get_timers()
+    if not timers:
+        typer.echo("No timer running")
+        return
+    timer = first(timers)
+
+    start = typer.prompt("Start time", default=timer.start.time().strftime("%H:%M"))
+    timer.start = parse_timestamp(start)
+    timer.issue = typer.prompt("Issue", default=timer.issue or "")
+    timer.note = typer.prompt("Description", default=timer.note or "")
+    timer.type = typer.prompt("Type", default=timer.type or "")
+
+    traggo.update_timer(timer)
+
+    typer.echo("")
+    typer.echo("Timer updated")
 
 
 @app.command()

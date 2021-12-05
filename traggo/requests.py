@@ -1,7 +1,9 @@
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
-from typing import Optional, Tuple
+from typing import Optional
+from typing import Tuple
+
 from gql import gql
 from graphql.language.ast import Document
 
@@ -37,7 +39,13 @@ def get_timers_query() -> Document:
     document = """
         query Trackers {
             timers {
-                id
+                id,
+                note,
+                start,
+                tags {
+                    key,
+                    value
+                }
             }
         }
     """
@@ -76,7 +84,8 @@ def stop_timer_mutation(timer_id: str, end_time: datetime) -> Tuple[Document, di
     document = """
         mutation StopTimer($id: Int!, $end: Time!) {
             stopTimeSpan(id: $id, end: $end) {
-                id
+                id,
+                end
             }
         }
     """
@@ -85,3 +94,20 @@ def stop_timer_mutation(timer_id: str, end_time: datetime) -> Tuple[Document, di
         "end": end_time.isoformat(),
     }
     return gql(document), variables
+
+
+def update_timer_mutation() -> Document:
+    document = """
+        mutation UpdateTimer($id: Int!, $start: Time!, $tags: [InputTimeSpanTag!], $note: String!) {
+            updateTimeSpan(id: $id, start: $start, tags: $tags, note: $note) {
+                id,
+                note,
+                start,
+                tags {
+                    key,
+                    value
+                }
+            }
+        }
+    """
+    return gql(document)

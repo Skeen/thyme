@@ -1,20 +1,23 @@
 from datetime import date
 from datetime import datetime
-from typing import Iterable, Optional
+from typing import Iterable
+from typing import Optional
 
+import pytz
 import typer
 from gql import Client
 from gql.transport.requests import RequestsHTTPTransport
+from more_itertools import first
 from more_itertools import one
 from pydantic import BaseModel
-import pytz
 
 from model import TimeEntry
-from util import hours_from_datetimes
+from traggo.requests import get_timers_query
 from traggo.requests import get_timespan_query
 from traggo.requests import start_timer_mutation
 from traggo.requests import stop_timer_mutation
-from traggo.requests import get_timers_query
+from traggo.requests import update_timer_mutation
+from util import hours_from_datetimes
 
 
 class TraggoTimeSpan(BaseModel):
@@ -34,6 +37,35 @@ class TraggoTimeSpan(BaseModel):
             raise typer.Exit()
 
         return cls(note=note, start=start, end=end, issue=issue)
+
+
+class TraggoTimer(BaseModel):
+    id: str
+    note: str
+    start: datetime
+    issue: Optional[str]
+    type: Optional[str]
+
+    @classmethod
+    def from_dict(cls, id, note, start, tags) -> "TraggoTimer":
+        issue = first(filter(lambda x: x["key"] == "issue", tags), {}).get("value")
+        type = first(filter(lambda x: x["key"] == "type", tags), {}).get("value")
+
+        return cls(id=id, note=note, start=start, issue=issue, type=type)
+
+    def to_dict(self) -> dict:
+        tags = []
+        if self.issue:
+            tags.append({"key": "issue", "value": self.issue})
+        if self.type:
+            tags.append({"key": "type", "value": self.type})
+
+        return {
+            "id": int(self.id),
+            "start": self.start.isoformat(),
+            "note": self.note,
+            "tags": tags,
+        }
 
 
 class TraggoConnector:
@@ -69,16 +101,25 @@ class TraggoConnector:
         timespans = self._get_timespans(from_date, to_date)
         return map(self._convert_timespan, timespans)
 
-    def start_timer(self, start_time: datetime, issue, type, note):
-        document, vars = start_timer_mutation(start_time, issue=issue, type=type, note=note)
+    def start_timer(self, start_time: datetime, issue: str, type: str, note: str):
+        document, vars = start_timer_mutation(
+            start_time, issue=issue, type=type, note=note
+        )
         self.traggo.execute(document, variable_values=vars)
 
-    def stop_timer(self, stop_time):
-        timers = self.traggo.execute(get_timers_query()).get("timers")
-        if not timers:
-            return
+    def get_timers(self) -> Iterable[TraggoTimer]:
+        r = self.traggo.execute(get_timers_query()).get("timers")
+        timers = list(map(lambda x: TraggoTimer.from_dict(**x), r))
+        if len(timers) > 1:
+            typer.secho("Warning: More than one active timer!", fg=typer.colors.YELLOW)
+        return timers
 
-        timer_id = timers[0].get("id")
+    def stop_timer(self, timer: TraggoTimer, stop_time: datetime):
+        document, vars = stop_timer_mutation(timer.id, stop_time)
+        self.traggo.execute(document, variable_values=vars)
 
-        document, vars = stop_timer_mutation(timer_id, stop_time)
+    def update_timer(self, timer: TraggoTimer):
+        document = update_timer_mutation()
+
+        vars = timer.to_dict()
         self.traggo.execute(document, variable_values=vars)
