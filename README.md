@@ -1,3 +1,5 @@
+<!-- SPDX-FileCopyrightText: Magenta ApS -->
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # Thyme 🌿
 
 Simple tool for reading timespans from [Traggo](https://traggo.net/) and sending them to Redmine.

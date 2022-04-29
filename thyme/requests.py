@@ -1,13 +1,16 @@
+# SPDX-FileCopyrightText: Magenta ApS <https://magenta.dk>
+# SPDX-License-Identifier: MPL-2.0
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
-from typing import Optional
-from typing import Tuple
+from typing import Any
 
 from gql import gql
-from graphql.language.ast import Document
 
-from util import convert_date_to_datetime
+from .util import convert_date_to_datetime
+
+
+Document = Any
 
 
 def get_timespan_query(from_date: date, to_date: date) -> Document:
@@ -54,11 +57,10 @@ def get_timers_query() -> Document:
 
 def start_timer_mutation(
     start_time: datetime,
-    issue: Optional[str] = None,
-    type: Optional[str] = None,
-    note: Optional[str] = "",
-) -> Tuple[Document, dict]:
-
+    issue: str | None = None,
+    type: str | None = None,
+    note: str | None = "",
+) -> tuple[Document, dict]:
     tags = []
     if issue:
         tags.append({"key": "issue", "value": issue})
@@ -80,7 +82,7 @@ def start_timer_mutation(
     return gql(document), variables
 
 
-def stop_timer_mutation(timer_id: str, end_time: datetime) -> Tuple[Document, dict]:
+def stop_timer_mutation(timer_id: str, end_time: datetime) -> tuple[Document, dict]:
     document = """
         mutation StopTimer($id: Int!, $end: Time!) {
             stopTimeSpan(id: $id, end: $end) {
@@ -98,7 +100,9 @@ def stop_timer_mutation(timer_id: str, end_time: datetime) -> Tuple[Document, di
 
 def update_timer_mutation() -> Document:
     document = """
-        mutation UpdateTimer($id: Int!, $start: Time!, $tags: [InputTimeSpanTag!], $note: String!) {
+        mutation UpdateTimer(
+            $id: Int!, $start: Time!, $tags: [InputTimeSpanTag!], $note: String!
+        ) {
             updateTimeSpan(id: $id, start: $start, tags: $tags, note: $note) {
                 id,
                 note,
