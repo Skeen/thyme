@@ -6,14 +6,17 @@ from typing import Optional
 
 import typer
 from more_itertools import bucket
+from more_itertools.more import first
 from tabulate import tabulate
 
+import config
 from model import TimeEntry
 from redmine import RedmineConnector
-from traggo import TraggoConnector
+from traggo.traggo import TraggoConnector
+from util import parse_timestamp
 
-REDMINE_URL = "https://redmine.magenta-aps.dk/"
-TRAGGO_URL = "https://traggo.moesgaard.dev"
+
+app = typer.Typer()
 
 
 def _parse_dates(
@@ -69,11 +72,94 @@ def _consolidate_entries(entries: Iterable[TimeEntry]) -> Iterable[TimeEntry]:
     return consolidated
 
 
-def main(
-    redmine_api_key: str = typer.Argument(..., envvar="REDMINE_API_KEY"),
-    traggo_api_key: str = typer.Argument(..., envvar="TRAGGO_API_KEY"),
-    redmine_url: str = typer.Argument(REDMINE_URL, envvar="REDMINE_URL"),
-    traggo_url: str = typer.Argument(TRAGGO_URL, envvar="TRAGGO_URL"),
+@app.command()
+def start(
+    start_time: str = typer.Option(
+        datetime.datetime.now().time().strftime("%H:%M"), prompt="Start time"
+    ),
+    issue: str = typer.Option("", prompt="Redmine ID"),
+    type: str = typer.Option("", prompt="Type"),
+    note: str = typer.Option("", prompt="Description"),
+):
+    """
+    Starts a new timer.
+    """
+    settings = config.get_settings()
+    traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
+
+    parsed_start_time = parse_timestamp(start_time)
+    traggo.start_timer(parsed_start_time, issue, type, note)
+
+    typer.echo("")
+    typer.echo("Timer started! 🚀")
+
+
+@app.command()
+def stop(
+    stop_time: str = typer.Option(
+        datetime.datetime.now().time().strftime("%H:%M"), prompt="Stop time"
+    ),
+):
+    """
+    Stops the currently running timer.
+
+    If more than one timer is running for whatever reason, the first one found
+    will be stopped
+    """
+    settings = config.get_settings()
+    traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
+
+    parsed_stop_time = parse_timestamp(stop_time)
+
+    timers = traggo.get_timers()
+    if not timers:
+        typer.echo("No timer running")
+        return
+    timer = first(timers)
+
+    traggo.stop_timer(timer, parsed_stop_time)
+
+    typer.echo("")
+    typer.echo("Timer stopped")
+
+
+@app.command()
+def edit():
+    """
+    Edits the currently running timer.
+    """
+    settings = config.get_settings()
+    traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
+    timers = traggo.get_timers()
+    if not timers:
+        typer.echo("No timer running")
+        return
+    timer = first(timers)
+
+    start = typer.prompt("Start time", default=timer.start.time().strftime("%H:%M"))
+    timer.start = parse_timestamp(start)
+    timer.issue = typer.prompt("Issue", default=timer.issue or "")
+    timer.note = typer.prompt("Description", default=timer.note or "")
+    timer.type = typer.prompt("Type", default=timer.type or "")
+
+    traggo.update_timer(timer)
+
+    typer.echo("")
+    typer.echo("Timer updated")
+
+
+@app.command()
+def status():
+    """
+    Shows the status of the currently running timer.
+    """
+    settings = config.get_settings()
+    traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
+    typer.echo("Not yet implemented, lol 🤷")
+
+
+@app.command()
+def export(
     date: Optional[str] = typer.Option(None, help="A single date to fetch."),
     from_date: Optional[str] = typer.Option(
         None, help="The lower bound of a date range to fetch. Is overridden by --date."
@@ -91,11 +177,11 @@ def main(
     By default, fetches time entries for todays date.
 
     Can optionally search for other dates, or date ranges.
-
     """
+    settings = config.get_settings()
     parsed_from_date, parsed_to_date = _parse_dates(date, from_date, to_date)
 
-    traggo = TraggoConnector(url=traggo_url, api_token=traggo_api_key)
+    traggo = TraggoConnector(url=settings.traggo_url, api_token=settings.traggo_api_key)
     entries = traggo.get_time_entries(parsed_from_date, parsed_to_date)
     entries = list(_consolidate_entries(entries))
 
@@ -113,9 +199,9 @@ def main(
         raise typer.Abort()
 
     # Send entries to Redmine
-    redmine = RedmineConnector(redmine_url, redmine_api_key)
+    redmine = RedmineConnector(settings.redmine_url, settings.redmine_api_key)
     redmine.create_time_entries(entries)
 
 
 if __name__ == "__main__":
-    typer.run(main)
+    app()
