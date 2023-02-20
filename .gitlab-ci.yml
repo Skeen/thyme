@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: Magenta ApS <https://magenta.dk>
+# SPDX-License-Identifier: MPL-2.0
+default:
+  # All jobs are interruptible by default
+  interruptible: true
+
+
+variables:
+  IMAGE_SHA: ${CI_REGISTRY_IMAGE}:${CI_COMMIT_SHA}
+  RELEASE_REGISTRY_IMAGE: index.docker.io/magentaaps/thyme
+  PYTEST_COV_MODULE: thyme
+  PYTEST_COV_FAIL_UNDER: 50
+
+stages:
+  - sync
+  - lint
+  - build
+  - test
+  - coverage
+  - release
+
+
+# Conditions
+#############
+.if-default-branch-refs: &if-default-branch-refs
+  if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+.if-tag: &if-tag
+  if: '$CI_COMMIT_TAG'
+
+.if-merge-request: &if-merge-request
+  if: '$CI_MERGE_REQUEST_IID'
+
+
+# Workflow
+###########
+workflow:
+  rules:
+    - <<: *if-tag
+    - <<: *if-default-branch-refs
+    - <<: *if-merge-request
+
+
+include:
+  - project: labs/salt-automation
+    file:
+      - gitlab-ci-templates/common/no-interrupt-meta.v1.yml
+      - gitlab-ci-templates/common/pre-commit.v1.yml
+      - gitlab-ci-templates/common/conventional-commits.v1.yml
+      - gitlab-ci-templates/python/pytest-meta.v1.yml
+      - gitlab-ci-templates/common/docker-build.v1.yml
+      - gitlab-ci-templates/common/docker-release.v1.yml
+
+
+Test:
+  image: python:3.10
+  extends: .pytest
+
+Export coverage:
+  image: python:3.10
+  extends: .export_coverage
+  needs: [Test]
+
+Check coverage:
+  image: python:3.10
+  extends: .check_coverage
+  needs: [Test]

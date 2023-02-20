@@ -1,23 +1,20 @@
-# -----------------------------------------------------------------
-# SPDX-FileCopyrightText: 2021 Magenta ApS <https://magenta.dk>
+# SPDX-FileCopyrightText: Magenta ApS
 # SPDX-License-Identifier: MPL-2.0
-# -----------------------------------------------------------------
 
-FROM python:3.9-slim
+FROM python:3.10@sha256:d2b05a68e1dbd756a940b951980bc4902aa21c15375c040d10b599ea7eef17cf
 
-ENV PIP_DISABLE_PIP_VERSION_CHECK=on \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/code \
-    POETRY_VERSION="1.1.6" \
-    POETRY_VIRTUALENVS_CREATE=true \
-    POETRY_VIRTUALENVS_IN_PROJECT=true
+RUN apt-get update && apt-get -y install unixodbc-dev freetds-dev unixodbc tdsodbc libkrb5-dev libmariadb-dev
 
-RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
-WORKDIR /code
-COPY poetry.lock pyproject.toml /code/
+WORKDIR /app
 
-RUN poetry install --no-dev --no-interaction 
+ENV POETRY_HOME=/opt/poetry \
+    POETRY_VIRTUALENVS_CREATE=false
 
-COPY . /code
+RUN curl -sSL https://install.python-poetry.org | python3 -
+COPY pyproject.toml poetry.lock ./
 
-ENTRYPOINT [ "poetry", "run", "python", "thyme.py" ]
+RUN POETRY_NO_INTERACTION=1 /opt/poetry/bin/poetry install --no-root --no-dev
+
+COPY . ./
+
+CMD ["uvicorn", "--factory", "thyme.app:create_app", "--host", "0.0.0.0"]
