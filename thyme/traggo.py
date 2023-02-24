@@ -1,13 +1,16 @@
 # SPDX-FileCopyrightText: Magenta ApS <https://magenta.dk>
 # SPDX-License-Identifier: MPL-2.0
 import math
+from collections.abc import Callable
 from collections.abc import Iterable
+from collections.abc import Iterator
+from collections.abc import Mapping
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
-from itertools import starmap
 from typing import Any
 from typing import cast
+from typing import TypeVar
 
 import pytz
 from gql import Client
@@ -27,6 +30,16 @@ from .requests import update_timer_mutation
 from .util import hours_from_datetimes
 
 
+T = TypeVar("T")
+
+
+def starstarmap(
+    function: Callable[..., T], iterable: Iterable[Mapping[str, Any]]
+) -> Iterator[T]:
+    for args in iterable:
+        yield function(**args)
+
+
 class MissingIssue(Exception):
     pass
 
@@ -44,7 +57,7 @@ class TraggoTimeSpan(BaseModel):
 
     @classmethod
     def parse_from_dict(
-        cls, note: str, start: datetime, end: datetime, tags: list[dict]
+        cls, id: int, note: str, start: datetime, end: datetime, tags: list[dict]
     ) -> "TraggoTimeSpan":
         try:
             issue = one(filter(lambda x: x["key"] == "issue", tags))["value"]
@@ -190,7 +203,7 @@ class TraggoConnector:
     ) -> Iterable[TraggoTimeSpan]:
         result = self.traggo.execute(get_timespan_query(from_date, to_date))
         timespans = result.get("timeSpans").get("timeSpans")
-        return starmap(TraggoTimeSpan.parse_from_dict, timespans)
+        return starstarmap(TraggoTimeSpan.parse_from_dict, timespans)
 
     def get_time_entries(self, from_date: date, to_date: date) -> list[TimeEntry]:
         timespans = list(self._get_timespans(from_date, to_date))

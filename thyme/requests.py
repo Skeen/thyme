@@ -24,6 +24,7 @@ def get_timespan_query(from_date: date, to_date: date) -> Document:
                 toInclusive: "{to_datetime.isoformat()}"
             ) {{
                 timeSpans {{
+                    id,
                     note,
                     start,
                     end,
