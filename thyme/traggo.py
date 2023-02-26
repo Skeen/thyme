@@ -27,6 +27,7 @@ from .requests import get_timespan_query
 from .requests import start_timer_mutation
 from .requests import stop_timer_mutation
 from .requests import update_timer_mutation
+from .util import convert_date_to_datetime
 from .util import hours_from_datetimes
 
 
@@ -156,31 +157,6 @@ class TraggoConnector:
         # TODO: Make timezone configurable
         return pytz.utc.localize(datetime.combine(input_date, datetime.min.time()))
 
-    def _get_timespan_query(self, from_date: date, to_date: date) -> Any:
-        from_datetime = self._convert_date_to_datetime(from_date)
-        to_datetime = self._convert_date_to_datetime(to_date) + timedelta(days=1)
-
-        query = f"""
-            {{
-                timeSpans(
-                    fromInclusive: "{from_datetime.isoformat()}",
-                    toInclusive: "{to_datetime.isoformat()}"
-                ) {{
-                    timeSpans {{
-                        id,
-                        start,
-                        end,
-                        note,
-                        tags {{
-                            key,
-                            value
-                        }}
-                    }}
-                }}
-            }}
-        """
-        return gql(query)
-
     def _convert_timespan(self, timespan: TraggoTimeSpan) -> tuple[TimeEntry, float]:
         hours = hours_from_datetimes(timespan.start, timespan.end, rounding=True)
         hours_no_rounding = hours_from_datetimes(
@@ -201,9 +177,26 @@ class TraggoConnector:
     def _get_timespans(
         self, from_date: date, to_date: date
     ) -> Iterable[TraggoTimeSpan]:
-        result = self.traggo.execute(get_timespan_query(from_date, to_date))
-        timespans = result.get("timeSpans").get("timeSpans")
-        return starstarmap(TraggoTimeSpan.parse_from_dict, timespans)
+        from_datetime = convert_date_to_datetime(from_date)
+        to_datetime = convert_date_to_datetime(to_date) + timedelta(days=1)
+
+        document = get_timespan_query()
+        vars = {
+            "from": from_datetime.isoformat(),
+            "to": to_datetime.isoformat(),
+        }
+        # Loop as long as there are more pages
+        while True:
+            result = self.traggo.execute(document, variable_values=vars)
+            paged_timespans = result["timeSpans"]
+            # Yield all parsed timespans in this page
+            timespans = paged_timespans["timeSpans"]
+            yield from starstarmap(TraggoTimeSpan.parse_from_dict, timespans)
+            # Fetch more pages using cursor (if more are available)
+            cursor = paged_timespans["cursor"]
+            if not cursor.pop("hasMore"):
+                return
+            vars["cursor"] = cursor
 
     def get_time_entries(self, from_date: date, to_date: date) -> list[TimeEntry]:
         timespans = list(self._get_timespans(from_date, to_date))

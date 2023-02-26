@@ -1,40 +1,39 @@
 # SPDX-FileCopyrightText: Magenta ApS <https://magenta.dk>
 # SPDX-License-Identifier: MPL-2.0
-from datetime import date
 from datetime import datetime
-from datetime import timedelta
 from typing import Any
 
 from gql import gql
 
-from .util import convert_date_to_datetime
-
-
 Document = Any
 
 
-def get_timespan_query(from_date: date, to_date: date) -> Document:
-    from_datetime = convert_date_to_datetime(from_date)
-    to_datetime = convert_date_to_datetime(to_date) + timedelta(days=1)
-
-    query = f"""
-        {{
+def get_timespan_query() -> Document:
+    query = """
+        query FetchTimespans(
+            $cursor: InputCursor, $from: Time, $to: Time
+        ) {
             timeSpans(
-                fromInclusive: "{from_datetime.isoformat()}",
-                toInclusive: "{to_datetime.isoformat()}"
-            ) {{
-                timeSpans {{
-                    id,
-                    note,
-                    start,
-                    end,
-                    tags {{
-                        key,
+                fromInclusive: $from, toInclusive: $to, cursor: $cursor
+            ) {
+                timeSpans {
+                    id
+                    note
+                    start
+                    end
+                    tags {
+                        key
                         value
-                    }}
-                }}
-            }}
-        }}
+                    }
+                }
+                cursor {
+                  hasMore
+                  startId
+                  offset
+                  pageSize
+                }
+            }
+        }
     """
     return gql(query)
 
