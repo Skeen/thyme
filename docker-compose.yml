@@ -3,6 +3,10 @@
 version: "3.9"
 services:
   thyme:
+    # Enabling tty and stdin allows setting a breakpoint() and doing
+    # `docker attach thyme_thyme_1` to enter pdb. Detach with Ctrl+P Ctrl+Q.
+    tty: true
+    stdin_open: true
     build:
       context: .
     command: ["uvicorn", "--factory", "thyme.app:create_app", "--host", "0.0.0.0", "--reload"]

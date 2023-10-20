@@ -21,7 +21,6 @@ from starlette.status import HTTP_204_NO_CONTENT
 from .config import Settings
 from .redmine import Base
 from .redmine import RedmineConnector
-from .traggo import MissingIssue
 from .traggo import TraggoConnector
 
 
@@ -38,7 +37,7 @@ async def synchronize_entries(
     from_date = from_date or date.today()
     to_date = to_date or date.today()
 
-    traggo = admin_traggo.as_user(user_id)
+    traggo = admin_traggo.impersonate(user_id)
     user_object = traggo.get_current_user()
     if user_object is None:
         raise HTTPException(
@@ -52,10 +51,6 @@ async def synchronize_entries(
     # Read entries from Traggo
     try:
         entries = list(traggo.get_time_entries(from_date, to_date))
-    except MissingIssue:
-        raise HTTPException(
-            status_code=422, detail="Missing 'issue' number tag one or more issues"
-        )
     except ValidationError as exception:
         raise HTTPException(status_code=422, detail=str(exception))
 
@@ -66,14 +61,17 @@ async def synchronize_entries(
         )
 
     # Send entries to Redmine
-    redmine = admin_redmine.as_user(username)
-    updated, created, up_to_date = redmine.create_time_entries(engine, entries)
+    redmine = admin_redmine.impersonate(username)
+    updated, created, up_to_date, missing_issue = redmine.create_time_entries(
+        engine, entries
+    )
 
     return {
         "entries": len(entries),
         "updated": updated,
         "created": created,
         "up_to_date": up_to_date,
+        "missing_issue": missing_issue,
     }
 
 
@@ -148,7 +146,7 @@ def create_app() -> FastAPI:
         "settings": settings,
     }
     app = FastAPI(
-        title=context["name"],
+        title=cast(str, context["name"]),
         contact={
             "name": "Magenta Aps",
             "url": "https://www.magenta.dk/",
