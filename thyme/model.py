@@ -7,7 +7,12 @@ from pydantic import BaseModel
 
 class TimeEntry(BaseModel):
     id: int
-    issue: int
-    description: str
+    note: str
+
+    tags: dict[str, str]
+
     hours: float
     date: datetime.date
+
+    def get_issue(self) -> str | None:
+        return self.tags.get("issue")
