@@ -102,7 +102,7 @@ class TraggoConnector:
         if user_id is not None:
             headers["X-Traggo-Impersonate"] = str(user_id)
         self.traggo = Client(
-            transport=RequestsHTTPTransport(url=f"{url}/graphql", headers=headers),
+            transport=RequestsHTTPTransport(url=f"{url}graphql", headers=headers),
             fetch_schema_from_transport=True,
         )
 
@@ -153,7 +153,7 @@ class TraggoConnector:
             TimeEntry(
                 id=timespan.id,
                 hours=hours,
-                date=timespan.start,
+                date=timespan.start.date(),
                 note=timespan.note,
                 tags={item["key"]: item["value"] for item in timespan.tags},
             ),
