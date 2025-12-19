@@ -25,19 +25,11 @@ class IDMapper(Base):
 
 
 class RedmineConnector:
-    def __init__(self, url: AnyHttpUrl, api_token: str, username: str | None = None):
+    def __init__(self, url: AnyHttpUrl, api_token: str) -> None:
         self._url = url
         self._api_token = api_token
 
-        self.redmine = Redmine(url=str(url), key=api_token, impersonate=username)
-
-    def impersonate(self, username: str) -> "RedmineConnector":
-        return RedmineConnector(self._url, self._api_token, username)
-
-    def check_if_user_exists(self, username: str) -> bool:
-        users = self.redmine.user.filter(name=username)
-        users = list(filter(lambda user: user.login == username, users))
-        return len(users) == 1
+        self.redmine = Redmine(url=str(url), key=api_token)
 
     def create_time_entries(
         self, engine: Engine, time_entries: Iterable[TimeEntry]

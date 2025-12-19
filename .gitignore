@@ -1,8 +1,5 @@
 # SPDX-FileCopyrightText: Magenta ApS
 # SPDX-License-Identifier: MPL-2.0
-.vscode
 *.db
 *.pyc
-.hypothesis
-.cache
-docker-compose.override.yml
+.env

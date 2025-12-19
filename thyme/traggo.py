@@ -93,55 +93,30 @@ class TraggoTimeSpan(BaseModel):
 
 
 class TraggoConnector:
-    def __init__(self, url: AnyHttpUrl, api_token: str, user_id: int | None = None):
+    def __init__(self, url: AnyHttpUrl, api_token: str) -> None:
         self._url = url
         self._api_token = api_token
 
         # Construct Client
         headers = {"Authorization": f"traggo {api_token}"}
-        if user_id is not None:
-            headers["X-Traggo-Impersonate"] = str(user_id)
         self.traggo = Client(
             transport=RequestsHTTPTransport(url=f"{url}graphql", headers=headers),
             fetch_schema_from_transport=True,
         )
 
-    def impersonate(self, user_id: int) -> "TraggoConnector":
-        # TODO: Assert that current user is admin
-        return TraggoConnector(self._url, self._api_token, user_id)
-
-    def get_all_users(self) -> dict[int, dict[str, Any]]:
-        query = gql(
-            """
-            query GetAllUsers {
-              users {
-                id
-                name
-                admin
-              }
-            }
-        """
-        )
-        result = self.traggo.execute(query)
-        usermap = {
-            x["id"]: {"name": x["name"], "admin": x["admin"]} for x in result["users"]
-        }
-        return usermap
-
-    def get_current_user(self) -> dict[str, Any]:
+    def is_admin(self) -> bool:
         query = gql(
             """
             query GetCurrentUser {
               currentUser {
-                id
-                name
                 admin
               }
             }
         """
         )
         result = self.traggo.execute(query)
-        return cast(dict[str, Any], result["currentUser"])
+        user = cast(dict[str, Any], result["currentUser"])
+        return bool(user["admin"])
 
     def _convert_timespan(self, timespan: TraggoTimeSpan) -> tuple[TimeEntry, float]:
         hours = hours_from_datetimes(timespan.start, timespan.end, rounding=True)
