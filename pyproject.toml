@@ -10,6 +10,9 @@ readme = "README.md"
 homepage = "https://magenta.dk/"
 repository = "https://git.magenta.dk/internal/thyme"
 keywords = ["redmine", "traggo"]
+packages = [
+    { include = "thyme" }
+]
 
 [tool.poetry.scripts]
 thyme = "thyme.app:run"
