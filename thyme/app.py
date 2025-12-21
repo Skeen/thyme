@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 import asyncio
 from datetime import date
+from datetime import timedelta
 
 from sqlalchemy import create_engine
 
@@ -25,7 +26,7 @@ async def main() -> None:
         settings.redmine_url, settings.redmine_api_key.get_secret_value()
     )
 
-    from_date = date.today()
+    from_date = date.today() - timedelta(days=30)
     to_date = date.today()
 
     if traggo.is_admin():
