@@ -102,6 +102,9 @@ class TraggoConnector:
         self.traggo = Client(
             transport=RequestsHTTPTransport(url=f"{url}graphql", headers=headers),
             fetch_schema_from_transport=True,
+            # gql 4 asks for deprecated input values when fetching the schema,
+            # which Traggo's GraphQL server rejects
+            introspection_args={"input_value_deprecation": False},
         )
 
     def is_admin(self) -> bool:
